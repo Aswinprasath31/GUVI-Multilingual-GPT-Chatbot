@@ -3,7 +3,7 @@ SUPPORTED_LANGUAGES = {
     "bn": "Bengali",
     "bodo": "Bodo", 
     "doi": "Dogri", 
-    "en": "English"
+    "en": "English",
     "gu": "Gujarati",
     "hi": "Hindi", 
     "kn": "Kannada",
