@@ -2,8 +2,4 @@ streamlit
 transformers
 torch
 langdetect
-<<<<<<< HEAD
 indic-transliteration
-=======
-indic-transliteration
->>>>>>> 7058e4b (Initial commit - GUVI Multilingual Chatbot)
