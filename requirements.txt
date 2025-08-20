@@ -5,3 +5,5 @@ sentencepiece
 indic-nlp-library
 huggingface_hub
 langdetect
+sacremoses
+
