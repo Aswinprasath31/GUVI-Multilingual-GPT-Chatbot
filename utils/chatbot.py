@@ -1,20 +1,23 @@
 # utils/chatbot.py
 import os
-import pandas as pd
-from sentence_transformers import SentenceTransformer, util
+import torch
+from transformers import GPT2LMHeadModel, GPT2Tokenizer
 
 class ChatBot:
-    def __init__(self, dataset_path="data/guvi_dataset_formatted.txt"):
-        # Load embedding model
-        self.model = SentenceTransformer('all-MiniLM-L6-v2')
-        
-        # Load dataset
+    def __init__(self, model_name="gpt2", dataset_path="data/guvi_dataset_formatted.txt", device=None):
+        # Load GPT-2 model + tokenizer
+        self.tokenizer = GPT2Tokenizer.from_pretrained(model_name)
+        self.model = GPT2LMHeadModel.from_pretrained(model_name)
+
+        # Ensure pad token
+        if self.tokenizer.pad_token is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+
+        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        self.model.to(self.device)
+
+        # Load dataset into memory
         self.qa_pairs = self._load_dataset(dataset_path)
-        
-        # Precompute embeddings
-        self.corpus_embeddings = self.model.encode(
-            [q for q, _ in self.qa_pairs], convert_to_tensor=True
-        )
 
     def _load_dataset(self, dataset_path):
         qa_pairs = []
@@ -27,13 +30,33 @@ class ChatBot:
                 qa_pairs.append((q, a))
         return qa_pairs
 
-    def get_response(self, query: str) -> str:
-        # Encode user query
-        query_embedding = self.model.encode(query, convert_to_tensor=True)
-        
-        # Find closest match
-        hits = util.semantic_search(query_embedding, self.corpus_embeddings, top_k=1)
-        best_idx = hits[0][0]['corpus_id']
-        best_score = hits[0][0]['score']
+    def get_response(self, query: str, max_new_tokens=100) -> str:
+        # Construct prompt from dataset + query
+        # Few-shot style: include some examples
+        prompt = ""
+        for q, a in self.qa_pairs[:3]:  # take 3 samples for context
+            prompt += f"User: {q}\nAssistant: {a}\n"
+        prompt += f"User: {query}\nAssistant:"
 
-        if best_score > 0.65:  # th_
+        # Encode
+        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
+
+        # Generate
+        output_ids = self.model.generate(
+            **inputs,
+            max_new_tokens=max_new_tokens,
+            pad_token_id=self.tokenizer.eos_token_id,
+            do_sample=True,
+            top_p=0.9,
+            temperature=0.7
+        )
+
+        output = self.tokenizer.decode(output_ids[0], skip_special_tokens=True)
+
+        # Extract only assistant part
+        if "Assistant:" in output:
+            response = output.split("Assistant:")[-1].strip()
+        else:
+            response = output.strip()
+
+        return response
